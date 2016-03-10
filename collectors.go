@@ -9,6 +9,7 @@ type GaugeVec interface {
 	WithLabelValues(lvs ...string) prometheus.Gauge
 	With(labels prometheus.Labels) prometheus.Gauge
 	Delete(labels prometheus.Labels) bool
+	Reset()
 }
 
 type OVirtGaugeVec struct {
@@ -83,5 +84,11 @@ func (t *StatsCollector) Process(data map[string]interface{}) {
 func (t *StatsCollector) Delete() {
 	for _, gauge := range t.gauges {
 		gauge.gaugeVec.Delete(t.labels)
+	}
+}
+
+func (t *StatsCollector) Reset() {
+	for _, gauge := range t.gauges {
+		gauge.gaugeVec.Reset()
 	}
 }

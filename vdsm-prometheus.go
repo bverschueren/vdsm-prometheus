@@ -5,17 +5,45 @@ import (
 	"flag"
 	"github.com/go-stomp/stomp"
 	"github.com/prometheus/client_golang/prometheus"
+	"log"
 	"net/http"
 	"time"
 )
 
 var (
 	hostGauges = []*OVirtGaugeVec{
-		NewHostGaugeVec("vmCount", "vms", "Number of VMs"),
+		NewHostGaugeVec("cpuSysVdsmd", "cpu_sys_vdsmd", "System CPU usage of vdsmd"),
+		NewHostGaugeVec("cpuIdle", "cpu_idle", "CPU idle time"),
+		NewHostGaugeVec("memFree", "mem_free", "Free memory"),
+		NewHostGaugeVec("swapFree", "swap_free", "Free swap space"),
+		NewHostGaugeVec("swapTotal", "swap_total", "Total swap space"),
+		NewHostGaugeVec("cpuLoad", "cpu_load", "Current CPU load"),
+		NewHostGaugeVec("ksmPages", "ksm_pages", "KSM pages"),
+		NewHostGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
+		NewHostGaugeVec("txDropped", "tx_dropped", "Dropped TX packages"),
+		NewHostGaugeVec("incomingVmMigrations", "incoming_vm_migrations", "Incoming VM migrations"),
+		NewHostGaugeVec("memShared", "mem_shared", "Shared memory"),
+		NewHostGaugeVec("rxRate", "rx_rate", "RX rate"),
+		NewHostGaugeVec("vmCount", "vm_count", "Number of VMs running on the host"),
+		NewHostGaugeVec("memUsed", "mem_used", "Memory currently in use"),
+		NewHostGaugeVec("cpuSys", "cpu_sys", "System CPU usage"),
+		NewHostGaugeVec("cpuUserVdsmd", "cpu_user_vdsmd", "Userspace CPU usage of vdsmd"),
+		NewHostGaugeVec("memCommitted", "mem_committed", "To VMs committed memory"),
+		NewHostGaugeVec("ksmCpu", "ksm_cpu", "KSM CPU usage"),
+		NewHostGaugeVec("memAvailable", "mem_available", "Available memory"),
+		NewHostGaugeVec("txRate", "tx_rate", "TX rate"),
+		NewHostGaugeVec("rxDropped", "rx_dropped", "Dropped RX packages"),
+		NewHostGaugeVec("outgoingVmMigrations", "outgoing_vm_migrations", "Outgoing VMs"),
 	}
 
 	vmGauges = []*OVirtGaugeVec{
+		NewVmGaugeVec("vcpuPeriod", "vcpu_period", "VCPU period"),
+		NewVmGaugeVec("memUsage", "mem_usage", "Memory usage"),
+		NewVmGaugeVec("cpuUsage", "cpu_usage", "CPU usage"),
 		NewVmGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
+		NewVmGaugeVec("monitorResponse", "monitor_response", "Monitor response"),
+		NewVmGaugeVec("cpuSys", "cpy_sys", "System CPU usage"),
+		NewVmGaugeVec("vcpuCount", "vcpu_count", "VCPU count"),
 	}
 )
 
@@ -83,6 +111,10 @@ func ProcessHostStats(channel chan *stomp.Message, host string, gauges []*OVirtG
 		if err := json.Unmarshal(msg.Body[:], &dat); err != nil {
 			panic(err)
 		}
+		if dat["error"] != nil {
+			err := dat["error"].(map[string]interface{})
+			log.Fatalf("JSON-RPC failed with error code %.0f: %s ", toFloat64(err["code"]), err["message"].(string))
+		}
 		hostData := dat["result"].(map[string]interface{})
 		collector := NewHostStatsCollector(gauges, host)
 		collector.Process(hostData)
@@ -90,6 +122,8 @@ func ProcessHostStats(channel chan *stomp.Message, host string, gauges []*OVirtG
 }
 
 func ProcessAllVmStats(channel chan *stomp.Message, host string, gauges []*OVirtGaugeVec) {
+	lastVMs := make(map[string]bool)
+	lastVmsCollectors := make(map[string]*StatsCollector)
 	for msg := range channel {
 		if msg.Err != nil {
 			panic(msg.Err)
@@ -98,9 +132,26 @@ func ProcessAllVmStats(channel chan *stomp.Message, host string, gauges []*OVirt
 		if err := json.Unmarshal(msg.Body[:], &dat); err != nil {
 			panic(err)
 		}
-		for _, vm := range dat["result"].([]map[string]interface{}) {
+		if dat["error"] != nil {
+			err := dat["error"].(map[string]interface{})
+			log.Fatalf("JSON-RPC failed with error code %.0f: %s ", toFloat64(err["code"]), err["message"].(string))
+		}
+		for k, _ := range lastVMs {
+			lastVMs[k] = false
+		}
+		for _, vm_data := range dat["result"].([]interface{}) {
+			vm := vm_data.(map[string]interface{})
 			collector := NewVmStatsCollector(gauges, host, vm)
 			collector.Process(vm)
+			lastVMs[vm["vmId"].(string)] = true
+			lastVmsCollectors[vm["vmId"].(string)] = collector
+		}
+		for k, v := range lastVMs {
+			if v == false {
+				lastVmsCollectors[k].Delete()
+				delete(lastVMs, k)
+				delete(lastVmsCollectors, k)
+			}
 		}
 	}
 }

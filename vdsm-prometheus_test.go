@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	vdsStatsFile = "get_vds_stats.json"
-	allVmStats   = "get_all_vm_stats.json"
-	localhost    = "127.0.0.1"
+	vdsStatsFile   = "get_vds_stats.json"
+	allVmStatsFile = "get_all_vm_stats.json"
+	localhost      = "127.0.0.1"
 )
 
 func check(e error) {
@@ -30,7 +30,7 @@ func readStats(fileName string) []byte {
 	return bytes
 }
 
-func TestMessage(t *testing.T) {
+func TestCollectingHostStats(t *testing.T) {
 	channel := make(chan *stomp.Message, 1)
 	channel <- newMessage(readStats(vdsStatsFile))
 	close(channel)
@@ -41,6 +41,21 @@ func TestMessage(t *testing.T) {
 	ProcessHostStats(channel, localhost, gauges)
 	gauges[0].gaugeVec.WithLabelValues(localhost).Write(m)
 	if expected, got := `label:<name:"host" value:"127.0.0.1" > gauge:<value:3 > `, m.String(); expected != got {
+		t.Errorf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestCollectingVmStats(t *testing.T) {
+	channel := make(chan *stomp.Message, 1)
+	channel <- newMessage(readStats(allVmStatsFile))
+	close(channel)
+	m := &dto.Metric{}
+	gauges := []*OVirtGaugeVec{
+		NewVmGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
+	}
+	ProcessAllVmStats(channel, localhost, gauges)
+	gauges[0].gaugeVec.WithLabelValues(localhost, "test1", "7549986b-4f2e-49a7-a692-94017fe0184a").Write(m)
+	if expected, got := `label:<name:"host" value:"127.0.0.1" > label:<name:"vm_id" value:"7549986b-4f2e-49a7-a692-94017fe0184a" > label:<name:"vm_name" value:"test1" > gauge:<value:0.87 > `, m.String(); expected != got {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
 }
