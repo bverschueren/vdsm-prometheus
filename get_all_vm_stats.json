@@ -1,1 +1,261 @@
-{"jsonrpc": "2.0", "id": 1, "result": [{"vcpuCount": "1", "displayInfo": [{"tlsPort": "-1", "ipAddress": "0", "type": "spice", "port": "5900"}], "hash": "-1710053601491374764", "acpiEnable": "true", "displayIp": "0", "guestFQDN": "", "vmId": "7549986b-4f2e-49a7-a692-94017fe0184a", "pid": "3805", "cpuUsage": "2420000000", "displayPort": "5900", "vNodeRuntimeInfo": {"0": [0]}, "session": "Unknown", "displaySecurePort": "-1", "timeOffset": "0", "memUsage": "0", "balloonInfo": {"balloon_max": "6144", "balloon_min": "6144", "balloon_target": "6144", "balloon_cur": "6144"}, "pauseCode": "NOERR", "vcpuQuota": "-1", "username": "Unknown", "kvmEnable": "true", "network": {"vnet0": {"macAddr": "00:1a:4a:16:01:51", "rxDropped": "271", "tx": "1323", "rxErrors": "0", "rx": "5406", "txDropped": "0", "txRate": "0.0", "rxRate": "0.0", "txErrors": "0", "state": "unknown", "sampleTime": 4297781.08, "speed": "1000", "name": "vnet0"}}, "vmJobs": {}, "cpuUser": "0.87", "disks": {"hdc": {"readLatency": "0", "writtenBytes": "0", "writeOps": "0", "apparentsize": "0", "readOps": "0", "writeLatency": "0", "readBytes": "0", "flushLatency": "0", "readRate": "0.0", "truesize": "0", "writeRate": "0.0"}}, "monitorResponse": "0", "elapsedTime": "1546", "vmType": "kvm", "guestIPs": "", "cpuSys": "0.07", "status": "Up", "guestCPUCount": -1, "appsList": [], "clientIp": "", "statusTime": "4297781080", "vmName": "test1", "displayType": "qxl", "vcpuPeriod": 100000}, {"vcpuCount": "1", "displayInfo": [{"tlsPort": "-1", "ipAddress": "0", "type": "spice", "port": "5901"}], "hash": "2499764613056966553", "acpiEnable": "true", "displayIp": "0", "guestFQDN": "", "vmId": "839e4033-a2b9-4643-a9d2-19b20f7565e5", "pid": "3877", "cpuUsage": "2600000000", "displayPort": "5901", "vNodeRuntimeInfo": {"0": [0]}, "session": "Unknown", "displaySecurePort": "-1", "timeOffset": "0", "memUsage": "0", "balloonInfo": {"balloon_max": "6144", "balloon_min": "6144", "balloon_target": "6144", "balloon_cur": "6144"}, "pauseCode": "NOERR", "vcpuQuota": "-1", "username": "Unknown", "kvmEnable": "true", "network": {"vnet1": {"macAddr": "00:1a:4a:16:01:52", "rxDropped": "271", "tx": "1323", "rxErrors": "0", "rx": "5302", "txDropped": "0", "txRate": "0.0", "rxRate": "0.0", "txErrors": "0", "state": "unknown", "sampleTime": 4297781.08, "speed": "1000", "name": "vnet1"}}, "vmJobs": {}, "cpuUser": "0.86", "disks": {"hdc": {"readLatency": "0", "writtenBytes": "0", "writeOps": "0", "apparentsize": "0", "readOps": "0", "writeLatency": "0", "readBytes": "0", "flushLatency": "0", "readRate": "0.0", "truesize": "0", "writeRate": "0.0"}}, "monitorResponse": "0", "elapsedTime": "1546", "vmType": "kvm", "guestIPs": "", "cpuSys": "0.13", "status": "Up", "guestCPUCount": -1, "appsList": [], "clientIp": "", "statusTime": "4297781080", "vmName": "test2", "displayType": "qxl", "vcpuPeriod": 100000}, {"vcpuCount": "1", "displayInfo": [{"tlsPort": "-1", "ipAddress": "0", "type": "spice", "port": "5902"}], "hash": "-729561570293037454", "acpiEnable": "true", "displayIp": "0", "guestFQDN": "", "vmId": "9c0e8007-8b89-43f4-b99a-8b22547802cf", "pid": "3956", "cpuUsage": "2390000000", "displayPort": "5902", "vNodeRuntimeInfo": {"0": [0]}, "session": "Unknown", "displaySecurePort": "-1", "timeOffset": "0", "memUsage": "0", "balloonInfo": {"balloon_max": "6144", "balloon_min": "6144", "balloon_target": "6144", "balloon_cur": "6144"}, "pauseCode": "NOERR", "vcpuQuota": "-1", "username": "Unknown", "kvmEnable": "true", "network": {"vnet2": {"macAddr": "00:1a:4a:16:01:53", "rxDropped": "271", "tx": "1323", "rxErrors": "0", "rx": "5312", "txDropped": "0", "txRate": "0.0", "rxRate": "0.0", "txErrors": "0", "state": "unknown", "sampleTime": 4297781.08, "speed": "1000", "name": "vnet2"}}, "vmJobs": {}, "cpuUser": "0.93", "disks": {"hdc": {"readLatency": "0", "writtenBytes": "0", "writeOps": "0", "apparentsize": "0", "readOps": "0", "writeLatency": "0", "readBytes": "0", "flushLatency": "0", "readRate": "0.0", "truesize": "0", "writeRate": "0.0"}}, "monitorResponse": "0", "elapsedTime": "1546", "vmType": "kvm", "guestIPs": "", "cpuSys": "0.07", "status": "Up", "guestCPUCount": -1, "appsList": [], "clientIp": "", "statusTime": "4297781080", "vmName": "test3", "displayType": "qxl", "vcpuPeriod": 100000}]}
+{
+  "result": [
+    {
+      "vcpuPeriod": 100000,
+      "displayType": "qxl",
+      "vmName": "test1",
+      "statusTime": "4297781080",
+      "clientIp": "",
+      "balloonInfo": {
+        "balloon_cur": "6144",
+        "balloon_target": "6144",
+        "balloon_min": "6144",
+        "balloon_max": "6144"
+      },
+      "memUsage": "0",
+      "timeOffset": "0",
+      "displaySecurePort": "-1",
+      "session": "Unknown",
+      "vNodeRuntimeInfo": {
+        "0": [
+          0
+        ]
+      },
+      "displayPort": "5900",
+      "cpuUsage": "2420000000",
+      "vcpuCount": "1",
+      "displayInfo": [
+        {
+          "port": "5900",
+          "type": "spice",
+          "ipAddress": "0",
+          "tlsPort": "-1"
+        }
+      ],
+      "hash": "-1710053601491374764",
+      "acpiEnable": "true",
+      "displayIp": "0",
+      "guestFQDN": "",
+      "vmId": "7549986b-4f2e-49a7-a692-94017fe0184a",
+      "pid": "3805",
+      "pauseCode": "NOERR",
+      "vcpuQuota": "-1",
+      "username": "Unknown",
+      "kvmEnable": "true",
+      "network": {
+        "vnet0": {
+          "name": "vnet0",
+          "speed": "1000",
+          "sampleTime": 4297781.08,
+          "state": "unknown",
+          "txErrors": "0",
+          "macAddr": "00:1a:4a:16:01:51",
+          "rxDropped": "271",
+          "tx": "1323",
+          "rxErrors": "0",
+          "rx": "5406",
+          "txDropped": "0",
+          "txRate": "0.0",
+          "rxRate": "0.0"
+        }
+      },
+      "vmJobs": {},
+      "cpuUser": "0.87",
+      "disks": {
+        "hdc": {
+          "writeRate": "0.0",
+          "truesize": "0",
+          "readRate": "0.0",
+          "readLatency": "0",
+          "writtenBytes": "0",
+          "writeOps": "0",
+          "apparentsize": "0",
+          "readOps": "0",
+          "writeLatency": "0",
+          "readBytes": "0",
+          "flushLatency": "0"
+        }
+      },
+      "monitorResponse": "0",
+      "elapsedTime": "1546",
+      "vmType": "kvm",
+      "guestIPs": "",
+      "cpuSys": "0.07",
+      "status": "Up",
+      "guestCPUCount": -1,
+      "appsList": []
+    },
+    {
+      "vcpuPeriod": 100000,
+      "displayType": "qxl",
+      "vmName": "test2",
+      "statusTime": "4297781080",
+      "clientIp": "",
+      "balloonInfo": {
+        "balloon_cur": "6144",
+        "balloon_target": "6144",
+        "balloon_min": "6144",
+        "balloon_max": "6144"
+      },
+      "memUsage": "0",
+      "timeOffset": "0",
+      "displaySecurePort": "-1",
+      "session": "Unknown",
+      "vNodeRuntimeInfo": {
+        "0": [
+          0
+        ]
+      },
+      "displayPort": "5901",
+      "cpuUsage": "2600000000",
+      "vcpuCount": "1",
+      "displayInfo": [
+        {
+          "port": "5901",
+          "type": "spice",
+          "ipAddress": "0",
+          "tlsPort": "-1"
+        }
+      ],
+      "hash": "2499764613056966553",
+      "acpiEnable": "true",
+      "displayIp": "0",
+      "guestFQDN": "",
+      "vmId": "839e4033-a2b9-4643-a9d2-19b20f7565e5",
+      "pid": "3877",
+      "pauseCode": "NOERR",
+      "vcpuQuota": "-1",
+      "username": "Unknown",
+      "kvmEnable": "true",
+      "network": {
+        "vnet1": {
+          "name": "vnet1",
+          "speed": "1000",
+          "sampleTime": 4297781.08,
+          "state": "unknown",
+          "txErrors": "0",
+          "macAddr": "00:1a:4a:16:01:52",
+          "rxDropped": "271",
+          "tx": "1323",
+          "rxErrors": "0",
+          "rx": "5302",
+          "txDropped": "0",
+          "txRate": "0.0",
+          "rxRate": "0.0"
+        }
+      },
+      "vmJobs": {},
+      "cpuUser": "0.86",
+      "disks": {
+        "hdc": {
+          "writeRate": "0.0",
+          "truesize": "0",
+          "readRate": "0.0",
+          "readLatency": "0",
+          "writtenBytes": "0",
+          "writeOps": "0",
+          "apparentsize": "0",
+          "readOps": "0",
+          "writeLatency": "0",
+          "readBytes": "0",
+          "flushLatency": "0"
+        }
+      },
+      "monitorResponse": "0",
+      "elapsedTime": "1546",
+      "vmType": "kvm",
+      "guestIPs": "",
+      "cpuSys": "0.13",
+      "status": "Up",
+      "guestCPUCount": -1,
+      "appsList": []
+    },
+    {
+      "vcpuPeriod": 100000,
+      "displayType": "qxl",
+      "vmName": "test3",
+      "statusTime": "4297781080",
+      "clientIp": "",
+      "balloonInfo": {
+        "balloon_cur": "6144",
+        "balloon_target": "6144",
+        "balloon_min": "6144",
+        "balloon_max": "6144"
+      },
+      "memUsage": "0",
+      "timeOffset": "0",
+      "displaySecurePort": "-1",
+      "session": "Unknown",
+      "vNodeRuntimeInfo": {
+        "0": [
+          0
+        ]
+      },
+      "displayPort": "5902",
+      "cpuUsage": "2390000000",
+      "vcpuCount": "1",
+      "displayInfo": [
+        {
+          "port": "5902",
+          "type": "spice",
+          "ipAddress": "0",
+          "tlsPort": "-1"
+        }
+      ],
+      "hash": "-729561570293037454",
+      "acpiEnable": "true",
+      "displayIp": "0",
+      "guestFQDN": "",
+      "vmId": "9c0e8007-8b89-43f4-b99a-8b22547802cf",
+      "pid": "3956",
+      "pauseCode": "NOERR",
+      "vcpuQuota": "-1",
+      "username": "Unknown",
+      "kvmEnable": "true",
+      "network": {
+        "vnet2": {
+          "name": "vnet2",
+          "speed": "1000",
+          "sampleTime": 4297781.08,
+          "state": "unknown",
+          "txErrors": "0",
+          "macAddr": "00:1a:4a:16:01:53",
+          "rxDropped": "271",
+          "tx": "1323",
+          "rxErrors": "0",
+          "rx": "5312",
+          "txDropped": "0",
+          "txRate": "0.0",
+          "rxRate": "0.0"
+        }
+      },
+      "vmJobs": {},
+      "cpuUser": "0.93",
+      "disks": {
+        "hdc": {
+          "writeRate": "0.0",
+          "truesize": "0",
+          "readRate": "0.0",
+          "readLatency": "0",
+          "writtenBytes": "0",
+          "writeOps": "0",
+          "apparentsize": "0",
+          "readOps": "0",
+          "writeLatency": "0",
+          "readBytes": "0",
+          "flushLatency": "0"
+        }
+      },
+      "monitorResponse": "0",
+      "elapsedTime": "1546",
+      "vmType": "kvm",
+      "guestIPs": "",
+      "cpuSys": "0.07",
+      "status": "Up",
+      "guestCPUCount": -1,
+      "appsList": []
+    }
+  ],
+  "id": 1,
+  "jsonrpc": "2.0"
+}
