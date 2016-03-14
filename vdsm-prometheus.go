@@ -60,6 +60,7 @@ func main() {
 	host := flag.String("host", "127.0.0.1", "vdsm ip or hostname")
 	port := flag.String("port", "54321", "vdsm connection details ip:port")
 	flag.Parse()
+
 	go func() {
 		for {
 			StartMonitoringVdsm(*host, *port)
@@ -71,7 +72,7 @@ func main() {
 	}()
 
 	http.Handle("/metrics", prometheus.Handler())
-	http.ListenAndServe(":8181", nil)
+	log.Fatal(http.ListenAndServe(":8181", nil))
 }
 
 func StartMonitoringVdsm(host string, port string) {
