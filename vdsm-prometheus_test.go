@@ -16,12 +16,6 @@ const (
 	localhost      = "127.0.0.1"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 func readStats(fileName string) []byte {
 	file, err := os.Open(fileName)
 	check(err)

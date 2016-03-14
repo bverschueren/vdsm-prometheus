@@ -1,14 +1,33 @@
 package main
 
 import (
+	"bufio"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rmohr/stomp"
+	"io"
+	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"os"
 	"time"
 )
+
+type Config struct {
+	Secured bool
+
+	SkipVerify bool
+
+	Host string
+
+	Port string
+
+	TlsConfig *tls.Config
+}
 
 var (
 	hostGauges = []*OVirtGaugeVec{
@@ -57,13 +76,41 @@ func init() {
 }
 
 func main() {
-	host := flag.String("host", "127.0.0.1", "vdsm ip or hostname")
-	port := flag.String("port", "54321", "vdsm connection details ip:port")
+	host := flag.String("host", "127.0.0.1", "VDSM ip or hostname")
+	port := flag.String("port", "54321", "VDSM connection details ip:port")
+	secure := flag.Bool("secure", true, "Secure connection to VDSM")
+	verify := flag.Bool("verify", false, "Verify certificates")
+	rootCa := flag.String("rootCa", "/etc/pki/vdsm/certs/cacert.pem", "Path to root certificate")
+	cert := flag.String("cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to client certificate")
+	key := flag.String("key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to client certificate key")
 	flag.Parse()
+
+	config := new(Config)
+	config.Secured = *secure
+	config.Host = *host
+	config.Port = *port
+	config.SkipVerify = !*verify
+
+	if *secure {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM([]byte(readFile(*rootCa)))
+		if !ok {
+			log.Fatal("Could not load root CA certificate")
+		}
+		certificate, err := tls.LoadX509KeyPair(*cert, *key)
+		if err != nil {
+			log.Fatal("Could not load certifacte pair")
+		}
+		config.TlsConfig = &tls.Config{
+			RootCAs:            roots,
+			Certificates:       []tls.Certificate{certificate},
+			InsecureSkipVerify: config.SkipVerify,
+		}
+	}
 
 	go func() {
 		for {
-			StartMonitoringVdsm(*host, *port)
+			StartMonitoringVdsm(config)
 			log.Print("No connection to VDSM. Will retry in 5 seconds.")
 			ResetGauges(hostGauges)
 			ResetGauges(vmGauges)
@@ -75,9 +122,19 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8181", nil))
 }
 
-func StartMonitoringVdsm(host string, port string) {
+func StartMonitoringVdsm(config *Config) {
 	var err error
-	conn, err := stomp.Dial("tcp", host+":"+port,
+	var tcpCon io.ReadWriteCloser
+	if config.Secured {
+		tcpCon, err = tls.Dial("tcp", config.Host+":"+config.Port, config.TlsConfig)
+	} else {
+		tcpCon, err = net.Dial("tcp", config.Host+":"+config.Port)
+	}
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	conn, err := stomp.Connect(tcpCon,
 		stomp.ConnOpt.AcceptVersion(stomp.V12),
 		stomp.ConnOpt.HeartBeat(5*time.Second, 5*time.Second),
 	)
@@ -103,8 +160,8 @@ func StartMonitoringVdsm(host string, port string) {
 	}
 	log.Print("Subscribed to 'jms.queue.vmStats'.")
 
-	hostProcChan := StartProcessingHostStats(MessageFilter(vdsStatsSub.C), host, hostGauges)
-	vmProcChan := StartProcessingVmStats(MessageFilter(vmStatsSub.C), host, vmGauges)
+	hostProcChan := StartProcessingHostStats(MessageFilter(vdsStatsSub.C), config.Host, hostGauges)
+	vmProcChan := StartProcessingVmStats(MessageFilter(vmStatsSub.C), config.Host, vmGauges)
 
 	hostReqChan := StartRequestingHostStats(conn, "jms.queue.vdsStats", "Host.getStats", "1234")
 	vmReqChan := StartRequestingHostStats(conn, "jms.queue.vmStats", "Host.getAllVmStats", "12345")
@@ -233,5 +290,19 @@ func StartProcessingVmStats(stats chan interface{}, host string, gauges []*OVirt
 func ResetGauges(gauges []*OVirtGaugeVec) {
 	for _, gauge := range gauges {
 		gauge.gaugeVec.Reset()
+	}
+}
+
+func readFile(fileName string) []byte {
+	file, err := os.Open(fileName)
+	check(err)
+	bytes, err := ioutil.ReadAll(bufio.NewReader(file))
+	check(err)
+	return bytes
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
 	}
 }
