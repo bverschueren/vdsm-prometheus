@@ -6,6 +6,10 @@ User=vdsm
 Restart=always
 RestartSec=5
 
+PermissionsStartOnly=true
+ExecStartPre=/sbin/iptables -I INPUT -p tcp --dport 8181 -j ACCEPT
+ExecStopPost=/sbin/iptables -D INPUT -p tcp --dport 8181 -j ACCEPT
+
 [Unit]
 Requires=vdsmd.service
 After=vdsmd.service
