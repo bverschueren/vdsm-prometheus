@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rmohr/stomp"
@@ -61,21 +60,18 @@ func main() {
 	host := flag.String("host", "127.0.0.1", "vdsm ip or hostname")
 	port := flag.String("port", "54321", "vdsm connection details ip:port")
 	flag.Parse()
-	MonitorVdsm(*host, *port)
-	http.Handle("/metrics", prometheus.Handler())
-	http.ListenAndServe(":8181", nil)
-}
-
-func MonitorVdsm(host string, port string) {
 	go func() {
 		for {
-			StartMonitoringVdsm(host, port)
+			StartMonitoringVdsm(*host, *port)
 			log.Print("No connection to VDSM. Will retry in 5 seconds.")
 			ResetGauges(hostGauges)
 			ResetGauges(vmGauges)
 			time.Sleep(5 * time.Second)
 		}
 	}()
+
+	http.Handle("/metrics", prometheus.Handler())
+	http.ListenAndServe(":8181", nil)
 }
 
 func StartMonitoringVdsm(host string, port string) {
@@ -112,14 +108,12 @@ func StartMonitoringVdsm(host string, port string) {
 	hostReqChan := StartRequestingHostStats(conn, "jms.queue.vdsStats", "Host.getStats", "1234")
 	vmReqChan := StartRequestingHostStats(conn, "jms.queue.vmStats", "Host.getAllVmStats", "12345")
 
-	err = nil
 	select {
-	case err = <-hostProcChan:
-	case err = <-vmProcChan:
-	case err = <-hostReqChan:
-	case err = <-vmReqChan:
+	case <-hostProcChan:
+	case <-vmProcChan:
+	case <-hostReqChan:
+	case <-vmReqChan:
 	}
-	log.Print(err)
 	conn.MustDisconnect()
 
 	<-hostProcChan
@@ -133,7 +127,7 @@ func StartMonitoringVdsm(host string, port string) {
 }
 
 func StartRequestingHostStats(conn *stomp.Conn, destination string, method string, id string) chan error {
-	done := make(chan error, 1)
+	done := make(chan error)
 	go func() {
 		defer close(done)
 		for {
@@ -142,7 +136,7 @@ func StartRequestingHostStats(conn *stomp.Conn, destination string, method strin
 				stomp.SendOpt.Header("reply-to", destination),
 				stomp.SendOpt.Header("id", id))
 			if err != nil {
-				done <- err
+				log.Print(err)
 				return
 			}
 			time.Sleep(2 * time.Second)
@@ -172,13 +166,12 @@ func MessageFilter(messages chan *stomp.Message) chan interface{} {
 				out <- dat["result"].(interface{})
 			}
 		}
-		close(out)
 	}()
 	return out
 }
 
 func StartProcessingHostStats(stats chan interface{}, host string, gauges []*OVirtGaugeVec) chan error {
-	done := make(chan error, 1)
+	done := make(chan error)
 	go func() {
 		defer close(done)
 		collector := NewHostStatsCollector(gauges, host)
@@ -188,7 +181,7 @@ func StartProcessingHostStats(stats chan interface{}, host string, gauges []*OVi
 				collector.Process(hostData)
 			} else {
 				collector.Reset()
-				done <- errors.New("Expected map but got something else.")
+				log.Print("Expected map but got something else.")
 				break
 			}
 		}
@@ -197,7 +190,7 @@ func StartProcessingHostStats(stats chan interface{}, host string, gauges []*OVi
 }
 
 func StartProcessingVmStats(stats chan interface{}, host string, gauges []*OVirtGaugeVec) chan error {
-	done := make(chan error, 1)
+	done := make(chan error)
 	go func() {
 		defer close(done)
 		lastVMs := make(map[string]bool)
@@ -205,7 +198,7 @@ func StartProcessingVmStats(stats chan interface{}, host string, gauges []*OVirt
 		for stat := range stats {
 			dat, found := stat.([]interface{})
 			if found == false {
-				done <- errors.New("Expected array but got something else.")
+				log.Print("Expected array but got something else.")
 				return
 			}
 			for k, _ := range lastVMs {
@@ -214,7 +207,7 @@ func StartProcessingVmStats(stats chan interface{}, host string, gauges []*OVirt
 			for _, vm_data := range dat {
 				vm, found := vm_data.(map[string]interface{})
 				if found == false {
-					done <- errors.New("Expected map but got something else.")
+					log.Print("Expected map but got something else.")
 					return
 				}
 				vmId := vm["vmId"].(string)
