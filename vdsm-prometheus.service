@@ -1,0 +1,14 @@
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vdsm-prometheus
+User=vdsm
+
+Restart=always
+RestartSec=5
+
+[Unit]
+Requires=vdsmd.service
+After=vdsmd.service
+
+[Install]
+WantedBy=multi-user.target
