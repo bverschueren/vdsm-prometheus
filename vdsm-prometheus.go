@@ -26,7 +26,7 @@ type Config struct {
 
 	Port string
 
-	TlsConfig *tls.Config
+	TLSConfig *tls.Config
 }
 
 var (
@@ -80,9 +80,14 @@ func main() {
 	port := flag.String("port", "54321", "VDSM connection details ip:port")
 	secure := flag.Bool("secure", true, "Secure connection to VDSM")
 	verify := flag.Bool("verify", false, "Verify certificates")
-	rootCa := flag.String("rootCa", "/etc/pki/vdsm/certs/cacert.pem", "Path to root certificate")
-	cert := flag.String("cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to client certificate")
-	key := flag.String("key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to client certificate key")
+	vdsmRootCa := flag.String("vdsm-ca", "/etc/pki/vdsm/certs/cacert.pem", "Path to VDSM CA certificate")
+	vdsmCert := flag.String("vdsm-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the VDSM client certificate")
+	vdsmKey := flag.String("vdsm-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the VDSM client certificate key")
+	requireAuth := flag.Bool("require-auth", true, "Secure the access to the exposed prometheus metrics by TLS ceritficates")
+	promRootCa := flag.String("prom-ca", "/etc/pki/vdsm/certs/cacert.pem", "Path to the Prometheus CA certificate")
+	promCert := flag.String("prom-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the Prometheus client server certificate")
+	promKey := flag.String("prom-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the Prometheus client server certificate key")
+
 	flag.Parse()
 
 	config := new(Config)
@@ -93,15 +98,15 @@ func main() {
 
 	if *secure {
 		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM([]byte(readFile(*rootCa)))
+		ok := roots.AppendCertsFromPEM(readFile(*vdsmRootCa))
 		if !ok {
 			log.Fatal("Could not load root CA certificate")
 		}
-		certificate, err := tls.LoadX509KeyPair(*cert, *key)
+		certificate, err := tls.LoadX509KeyPair(*vdsmCert, *vdsmKey)
 		if err != nil {
 			log.Fatal("Could not load certifacte pair")
 		}
-		config.TlsConfig = &tls.Config{
+		config.TLSConfig = &tls.Config{
 			RootCAs:            roots,
 			Certificates:       []tls.Certificate{certificate},
 			InsecureSkipVerify: config.SkipVerify,
@@ -119,14 +124,33 @@ func main() {
 	}()
 
 	http.Handle("/metrics", prometheus.Handler())
-	log.Fatal(http.ListenAndServe(":8181", nil))
+
+	if *requireAuth {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM(readFile(*promRootCa))
+		if !ok {
+			log.Fatal("Could not load root CA certificate")
+		}
+		tlsConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ClientCAs:  roots,
+		}
+
+		server := &http.Server{
+			Addr:      ":8181",
+			TLSConfig: tlsConfig,
+		}
+		log.Fatal(server.ListenAndServeTLS(*promCert, *promKey))
+	} else {
+		log.Fatal(http.ListenAndServe(":8181", nil))
+	}
 }
 
 func StartMonitoringVdsm(config *Config) {
 	var err error
 	var tcpCon io.ReadWriteCloser
 	if config.Secured {
-		tcpCon, err = tls.Dial("tcp", config.Host+":"+config.Port, config.TlsConfig)
+		tcpCon, err = tls.Dial("tcp", config.Host+":"+config.Port, config.TLSConfig)
 	} else {
 		tcpCon, err = net.Dial("tcp", config.Host+":"+config.Port)
 	}
