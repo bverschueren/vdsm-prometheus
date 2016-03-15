@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -13,7 +12,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -318,15 +316,13 @@ func ResetGauges(gauges []*OVirtGaugeVec) {
 }
 
 func readFile(fileName string) []byte {
-	file, err := os.Open(fileName)
-	check(err)
-	bytes, err := ioutil.ReadAll(bufio.NewReader(file))
+	bytes, err := ioutil.ReadFile(fileName)
 	check(err)
 	return bytes
 }
 
 func check(e error) {
 	if e != nil {
-		panic(e)
+		log.Panic(e)
 	}
 }
