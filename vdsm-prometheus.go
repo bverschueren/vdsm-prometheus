@@ -25,6 +25,12 @@ type Config struct {
 	Port string
 
 	TLSConfig *tls.Config
+
+	StompHeartBeat time.Duration
+
+	VMScrapeInterval time.Duration
+
+	HostScrapeInterval time.Duration
 }
 
 var (
@@ -76,25 +82,31 @@ func init() {
 func main() {
 	host := flag.String("host", "127.0.0.1", "VDSM ip or hostname")
 	port := flag.String("port", "54321", "VDSM connection details ip:port")
-	secure := flag.Bool("secure", true, "Secure connection to VDSM")
+	noVdsmAuth := flag.Bool("no-vdsm-auth", false, "Disable TLS certificate authentification and encryption when connecting to VDSM")
 	verify := flag.Bool("verify", false, "Verify certificates")
 	vdsmRootCa := flag.String("vdsm-ca", "/etc/pki/vdsm/certs/cacert.pem", "Path to VDSM CA certificate")
 	vdsmCert := flag.String("vdsm-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the VDSM client certificate")
 	vdsmKey := flag.String("vdsm-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the VDSM client certificate key")
-	requireAuth := flag.Bool("require-auth", true, "Secure the access to the exposed prometheus metrics by TLS ceritficates")
+	noPromAuth := flag.Bool("no-prom-auth", false, "Disable TLS certificate authentification for accessing the exposed prometheus metrics")
 	promRootCa := flag.String("prom-ca", "/etc/pki/vdsm/certs/cacert.pem", "Path to the Prometheus CA certificate")
 	promCert := flag.String("prom-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the Prometheus client server certificate")
 	promKey := flag.String("prom-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the Prometheus client server certificate key")
+	stompHeartBeat := flag.Int("stomp-heartbeat", 5, "Stomp heartbeat in seconds")
+	vmScrapeInterval := flag.Int("vm-scrape-interval", 3, "VM metrics scrape interval in seconds")
+	hostScrapeInterval := flag.Int("host-scrape-interval", 3, "Host metrics statistics scrape interval in seconds")
 
 	flag.Parse()
 
 	config := new(Config)
-	config.Secured = *secure
+	config.Secured = !*noVdsmAuth
 	config.Host = *host
 	config.Port = *port
 	config.SkipVerify = !*verify
+	config.StompHeartBeat = time.Duration(*stompHeartBeat) * time.Second
+	config.VMScrapeInterval = time.Duration(*vmScrapeInterval) * time.Second
+	config.HostScrapeInterval = time.Duration(*hostScrapeInterval) * time.Second
 
-	if *secure {
+	if config.Secured {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(readFile(*vdsmRootCa))
 		if !ok {
@@ -123,7 +135,7 @@ func main() {
 
 	http.Handle("/metrics", prometheus.Handler())
 
-	if *requireAuth {
+	if !*noPromAuth {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(readFile(*promRootCa))
 		if !ok {
@@ -158,7 +170,7 @@ func StartMonitoringVdsm(config *Config) {
 	}
 	conn, err := stomp.Connect(tcpCon,
 		stomp.ConnOpt.AcceptVersion(stomp.V12),
-		stomp.ConnOpt.HeartBeat(5*time.Second, 5*time.Second),
+		stomp.ConnOpt.HeartBeat(config.StompHeartBeat, config.StompHeartBeat),
 	)
 	if err != nil {
 		log.Print(err)
@@ -185,8 +197,8 @@ func StartMonitoringVdsm(config *Config) {
 	hostProcChan := StartProcessingHostStats(MessageFilter(vdsStatsSub.C), config.Host, hostGauges)
 	vmProcChan := StartProcessingVmStats(MessageFilter(vmStatsSub.C), config.Host, vmGauges)
 
-	hostReqChan := StartRequestingHostStats(conn, "jms.queue.vdsStats", "Host.getStats", "1234")
-	vmReqChan := StartRequestingHostStats(conn, "jms.queue.vmStats", "Host.getAllVmStats", "12345")
+	hostReqChan := StartRequestingHostStats(conn, "jms.queue.vdsStats", "Host.getStats", "1234", config.HostScrapeInterval)
+	vmReqChan := StartRequestingHostStats(conn, "jms.queue.vmStats", "Host.getAllVmStats", "12345", config.VMScrapeInterval)
 
 	select {
 	case <-hostProcChan:
@@ -206,7 +218,7 @@ func StartMonitoringVdsm(config *Config) {
 	log.Print("Requesting vm stats finished.")
 }
 
-func StartRequestingHostStats(conn *stomp.Conn, destination string, method string, id string) chan error {
+func StartRequestingHostStats(conn *stomp.Conn, destination string, method string, id string, scrape_interval time.Duration) chan error {
 	done := make(chan error)
 	go func() {
 		defer close(done)
@@ -219,7 +231,7 @@ func StartRequestingHostStats(conn *stomp.Conn, destination string, method strin
 				log.Print(err)
 				return
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(scrape_interval)
 		}
 	}()
 	return done
