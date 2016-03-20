@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rmohr/stomp"
@@ -18,7 +19,7 @@ import (
 type Config struct {
 	Secured bool
 
-	SkipVerify bool
+	NoVerify bool
 
 	Host string
 
@@ -80,10 +81,10 @@ func init() {
 }
 
 func main() {
-	host := flag.String("host", "127.0.0.1", "VDSM ip or hostname")
-	port := flag.String("port", "54321", "VDSM connection details ip:port")
+	host := flag.String("host", "", "VDSM IP or hostname. If not given and TLS for VDSM is enabled it will be extracted from the VDSM certificate. If TLS is disabled '127.0.0.1' will be used")
+	port := flag.String("port", "54321", "VDSM port")
 	noVdsmAuth := flag.Bool("no-vdsm-auth", false, "Disable TLS certificate authentification and encryption when connecting to VDSM")
-	verify := flag.Bool("verify", false, "Verify certificates")
+	noVerify := flag.Bool("no-verify", false, "Disable TLS host verification when connecting to VDSM")
 	vdsmRootCa := flag.String("vdsm-ca", "/etc/pki/vdsm/certs/cacert.pem", "Path to VDSM CA certificate")
 	vdsmCert := flag.String("vdsm-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the VDSM client certificate")
 	vdsmKey := flag.String("vdsm-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the VDSM client certificate key")
@@ -101,7 +102,7 @@ func main() {
 	config.Secured = !*noVdsmAuth
 	config.Host = *host
 	config.Port = *port
-	config.SkipVerify = !*verify
+	config.NoVerify = *noVerify
 	config.StompHeartBeat = time.Duration(*stompHeartBeat) * time.Second
 	config.VMScrapeInterval = time.Duration(*vmScrapeInterval) * time.Second
 	config.HostScrapeInterval = time.Duration(*hostScrapeInterval) * time.Second
@@ -112,21 +113,34 @@ func main() {
 		if !ok {
 			log.Fatal("Could not load root CA certificate")
 		}
+		if *host == "" {
+			block, _ := pem.Decode(readFile(*vdsmCert))
+			if block == nil {
+				panic("failed to parse certificate PEM")
+			}
+			blub, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				log.Fatal(err)
+			}
+			config.Host = blub.Subject.CommonName
+		}
 		certificate, err := tls.LoadX509KeyPair(*vdsmCert, *vdsmKey)
 		if err != nil {
-			log.Fatal("Could not load certifacte pair")
+			log.Fatal(err)
 		}
 		config.TLSConfig = &tls.Config{
 			RootCAs:            roots,
 			Certificates:       []tls.Certificate{certificate},
-			InsecureSkipVerify: config.SkipVerify,
+			InsecureSkipVerify: config.NoVerify,
 		}
+	} else if *host == "" {
+		config.Host = "127.0.0.1"
 	}
 
 	go func() {
 		for {
 			StartMonitoringVdsm(config)
-			log.Print("No connection to VDSM. Will retry in 5 seconds.")
+			log.Printf("No connection to VDSM at %s:%s. Will retry in 5 seconds.", config.Host, config.Port)
 			ResetGauges(hostGauges)
 			ResetGauges(vmGauges)
 			time.Sleep(5 * time.Second)
@@ -176,7 +190,7 @@ func StartMonitoringVdsm(config *Config) {
 		log.Print(err)
 		return
 	}
-	log.Print("Connected to VDSM.")
+	log.Printf("Connected to VDSM at %s:%s.", config.Host, config.Port)
 
 	vdsStatsSub, err := conn.Subscribe("jms.queue.vdsStats", stomp.AckAuto,
 		stomp.SubscribeOpt.Header("id", "1234"))

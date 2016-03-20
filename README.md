@@ -1,19 +1,30 @@
 # vdsm-prometheus
 Go client for VDSM which exposes host and VM stats as prometheus metrics.
 
+The main purpose of this client is to run as a sidecar on every host where VDSM
+is running. It will use the VDSM TLS certificate found on the host to connect
+to VDSM and reuses this certificate to allow secured access for Prometheus to
+the VDSM metrics.
+
 ## Run it
+The easiest way for development is to disable VDSM TLS authentication on the
+target host. Then build vdsm-prometheus, disable TLS authentication and point
+it to the target VDSM server.
 ```bash
 $ go build .
-$ ./vdsm-prometheus -host {vdsm-ip}
+$ ./vdsm-prometheus -host {vdsm-ip} -no-prom-auth -no-vdsm-auth
 ```
 Visit <http://localhost:8181/metrics> to find all the metrics exposed for
 prometheus.
 
 ## Docker
-Run
+During development to test vdsm-prometheus with Prometheus and Grafana you can
+run
 ```bash
 bash run_prometheus.sh {vdsm-ip}
 ```
+Make sure to disable TLS on the target VDSM host or to provide valid
+certificates to vdsm-prometheus.
 
 This will start vdsm-promehteus, prometheus and grafana in docker containers:
 
