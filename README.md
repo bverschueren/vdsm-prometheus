@@ -6,6 +6,8 @@ is running. It will use the VDSM TLS certificate found on the host to connect
 to VDSM and reuses this certificate to allow secured access for Prometheus to
 the VDSM metrics.
 
+[![Build Status](https://travis-ci.org/rmohr/vdsm-prometheus.svg?branch=master)](https://travis-ci.org/rmohr/vdsm-prometheus)
+
 ## Run it
 The easiest way for development is to disable VDSM TLS authentication on the
 target host. Then build vdsm-prometheus, disable TLS authentication and point
