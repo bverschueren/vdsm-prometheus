@@ -13,7 +13,7 @@ RestartSec=5
 #ExecStopPost=/usr/bin/firewall-cmd --zone=public --add-port=8181/tcp
 
 [Unit]
-Requires=vdsmd.service
+BindsTo=vdsmd.service
 After=vdsmd.service
 
 [Install]
