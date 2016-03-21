@@ -6,9 +6,11 @@ User=vdsm
 Restart=always
 RestartSec=5
 
-PermissionsStartOnly=true
-ExecStartPre=/sbin/iptables -I INPUT -p tcp --dport 8181 -j ACCEPT
-ExecStopPost=/sbin/iptables -D INPUT -p tcp --dport 8181 -j ACCEPT
+#PermissionsStartOnly=true
+#ExecStartPre=/sbin/iptables -I INPUT -p tcp --dport 8181 -j ACCEPT
+#ExecStopPost=/sbin/iptables -D INPUT -p tcp --dport 8181 -j ACCEPT
+#ExecStartPre=/usr/bin/firewall-cmd --zone=public --add-port=8181/tcp
+#ExecStopPost=/usr/bin/firewall-cmd --zone=public --add-port=8181/tcp
 
 [Unit]
 Requires=vdsmd.service
