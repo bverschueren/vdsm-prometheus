@@ -50,17 +50,15 @@ When trying out Prometheus it can be handy to allow Prometheus to access the
 metrics without configuring a valid TLS certificate.  To do this, either run
 `vdsm-prometheus -no-verify -no-prom-auth` directly or let systemd do the work
 for you:
-```bash
-mkdir -p /etc/systemd/system/vdsm-prometheus.service.d/
-touch /etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf
-vi /etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf
-```
-Add the following to `/etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf`:
+
+Add the following to
+`/etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf`
+(create the directory or file if it does not exist):
 ```
 [Service]
 Environment=VDSM_PROM_OPTS=-no-verify -no-prom-auth
 ```
-Finally restart the service:
+Then restart the service:
 ```
 systemctl daemon-reload
 systemctl restart vdsm-prometheus
