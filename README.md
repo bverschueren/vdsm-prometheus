@@ -8,7 +8,71 @@ the VDSM metrics.
 
 [![Build Status](https://travis-ci.org/rmohr/vdsm-prometheus.svg?branch=master)](https://travis-ci.org/rmohr/vdsm-prometheus)
 
-## Run it
+
+## Use it
+
+The easisest way is to install the RPMs from
+[copr](https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/).
+After activating the `vdsm-prometheus` service the metrics are exposed at
+`:8181/metrics`.
+
+### CentOS
+```bash
+curl https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/repo/epel-7/rfenkhuber-vdsm-prometheus-epel-7.repo > /etc/yum.repos.d/vdsm-prometheus.repo
+yum install vdsm-prometheus
+systemctl start vdsm-prometheus
+```
+### Fedora
+```bash
+dnf copr enable rfenkhuber/vdsm-prometheus
+dnf install vdsm-prometheus
+systemctl start vdsm-prometheus
+```
+
+### Firewall configuration
+
+For `iptables`:
+```bash
+iptables -I INPUT -p tcp --dport 8181 -j ACCEPT
+iptables -D INPUT -p tcp --dport 8181 -j ACCEPT
+```
+
+For `firewalld`:
+
+```bash
+firewall-cmd --zone=public --add-port=8181/tcp
+firewall-cmd --zone=public --add-port=8181/tcp
+```
+
+### Disable TLS for Prometheus
+
+When trying out Prometheus it can be handy to allow Prometheus to access the
+metrics without configuring a valid TLS certificate.  To do this, either run
+`vdsm-prometheus -no-verify -no-prom-auth` directly or let systemd do the work
+for you:
+```bash
+mkdir -p /etc/systemd/system/vdsm-prometheus.service.d/
+touch /etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf
+vi /etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf
+```
+Add the following to `/etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf`:
+```
+[Service]
+Environment=VDSM_PROM_OPTS=-no-verify -no-prom-auth
+```
+Finally restart the service:
+```
+systemctl daemon-reload
+systemctl restart vdsm-prometheus
+```
+
+`vdsm-prometheus` now still uses TLS when communicating with VDSM but
+Prometheus can access the metrics without authentication.
+
+Verify that TLS is disabled by running `curl localhost:8181/metrics` on the
+VDSM host.
+
+## Hacking
 The easiest way for development is to disable VDSM TLS authentication on the
 target host. Then build vdsm-prometheus, disable TLS authentication and point
 it to the target VDSM server.
