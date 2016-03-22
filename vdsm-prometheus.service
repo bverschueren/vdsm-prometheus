@@ -1,6 +1,6 @@
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/vdsm-prometheus
+ExecStart=/usr/bin/vdsm-prometheus $VDSM_PROM_OPTS
 User=vdsm
 
 Restart=always
