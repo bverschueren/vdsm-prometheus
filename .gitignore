@@ -23,4 +23,4 @@ _testmain.go
 *.test
 *.prof
 
-vdsm-prometheus
+/vdsm-prometheus
