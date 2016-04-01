@@ -70,6 +70,23 @@ Prometheus can access the metrics without authentication.
 Verify that TLS is disabled by running `curl localhost:8181/metrics` on the
 VDSM host.
 
+## Ansible
+
+The repository comes with a playbook to provision you oVirt hosts with
+vdsm-prometheus. The playbooks are located in the `ansible` subdirectory.
+
+To playbooks expect a host group called `vdsm` in your inventory.  A possible
+execution might look like this
+
+```
+cd ansible
+ansible-playbook -s vdsm-prometheus.yml
+```
+
+The playbook will install the the latest version of `vdsm-prometheus` from
+[copr](https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/),
+configure systemd, the firewall and finally starts vdsm-prometheus.
+
 ## Hacking
 The easiest way for development is to disable VDSM TLS authentication on the
 target host. Then build vdsm-prometheus, disable TLS authentication and point

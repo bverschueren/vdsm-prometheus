@@ -1,0 +1,11 @@
+---
+- hosts: vdsm
+  roles:
+    - role: vdsm-prometheus-copr
+  tasks:
+    - name: Install vdsm-prometheus
+      yum: name=vdsm-prometheus state=latest
+    - name: Open port 8181
+      shell: iptables -D INPUT -p tcp --dport 8181 -j ACCEPT  || true && iptables -I INPUT -p tcp --dport 8181 -j ACCEPT && service iptables save
+    - name: Enable and start vdsm-prometheus service
+      service: name=vdsm-prometheus enabled=yes state=restarted

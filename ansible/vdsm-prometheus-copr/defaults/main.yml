@@ -1,0 +1,4 @@
+---
+vdsm_prometheus_epel_repo_url: "https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/repo/epel-{{ ansible_distribution_major_version }}/rfenkhuber-vdsm-prometheus-epel-{{ ansible_distribution_major_version }}.repo"
+vdsm_prometheus_fedora_repo_url: "https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/repo/fedora-{{ ansible_distribution_major_version }}/rfenkhuber-vdsm-prometheus-fedora-{{ ansible_distribution_major_version }}.repo"
+vdsm_prometheus_repo_gpg_key_url: "https://copr-be.cloud.fedoraproject.org/results/rfenkhuber/vdsm-prometheus/pubkey.gpg"
