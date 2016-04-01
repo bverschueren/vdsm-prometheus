@@ -34,13 +34,11 @@ systemctl start vdsm-prometheus
 For `iptables`:
 ```bash
 iptables -I INPUT -p tcp --dport 8181 -j ACCEPT
-iptables -D INPUT -p tcp --dport 8181 -j ACCEPT
 ```
 
 For `firewalld`:
 
 ```bash
-firewall-cmd --zone=public --add-port=8181/tcp
 firewall-cmd --zone=public --add-port=8181/tcp
 ```
 
