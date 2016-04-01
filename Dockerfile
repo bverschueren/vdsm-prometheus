@@ -1,4 +1,4 @@
-FROM centos:7.2.1511
+FROM sdurrheimer/alpine-glibc
 
 EXPOSE 8181
 
