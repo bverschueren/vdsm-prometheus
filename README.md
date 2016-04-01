@@ -56,7 +56,7 @@ Add the following to
 (create the directory or file if it does not exist):
 ```
 [Service]
-Environment=VDSM_PROM_OPTS=-no-verify -no-prom-auth
+Environment="VDSM_PROM_OPTS=-no-verify -no-prom-auth"
 ```
 Then restart the service:
 ```
