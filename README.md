@@ -52,12 +52,12 @@ for you:
 Add the following to
 `/etc/systemd/system/vdsm-prometheus.service.d/10-vdsm-prometheus.conf`
 (create the directory or file if it does not exist):
-```
+```ini
 [Service]
 Environment="VDSM_PROM_OPTS=-no-verify -no-prom-auth"
 ```
 Then restart the service:
-```
+```bash
 systemctl daemon-reload
 systemctl restart vdsm-prometheus
 ```
@@ -70,13 +70,14 @@ VDSM host.
 
 ## Ansible
 
-The repository comes with a playbook to provision you oVirt hosts with
-vdsm-prometheus. The playbooks are located in the `ansible` subdirectory.
+The repository comes with an ansible role and an example playbook to provision
+you oVirt hosts with vdsm-prometheus. The playbook and the role are located in
+the `ansible` subdirectory.
 
-To playbooks expect a host group called `vdsm` in your inventory.  A possible
+To playbooks expect a host group called `vdsm` in your inventory. A possible
 execution might look like this
 
-```
+```bash
 cd ansible
 ansible-playbook -s vdsm-prometheus.yml
 ```
@@ -84,6 +85,17 @@ ansible-playbook -s vdsm-prometheus.yml
 The playbook will install the the latest version of `vdsm-prometheus` from
 [copr](https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/),
 configure systemd, the firewall and finally starts vdsm-prometheus.
+
+It is possible to specify the `vdsm-prometheus` configuration in a playbook.
+For instance to allow browsing the metrics without TLS run a playbook like
+this:
+
+```yaml
+---
+- hosts: vdsm
+  roles:
+    - { role: vdsm-prometheus, opts: "-no-verify -no-prom-auth" }
+```
 
 ## Hacking
 The easiest way for development is to disable VDSM TLS authentication on the
