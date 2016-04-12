@@ -1,4 +1,0 @@
----
-- hosts: vdsm
-  roles:
-    - { role: vdsm-prometheus, opts: "-no-verify -no-prom-auth" }

@@ -70,25 +70,16 @@ VDSM host.
 
 ## Ansible
 
-The repository comes with an ansible role and an example playbook to provision
-you oVirt hosts with vdsm-prometheus. The playbook and the role are located in
-the `ansible` subdirectory.
-
-To playbooks expect a host group called `vdsm` in your inventory. A possible
-execution might look like this
+There exists an 
+[Ansible role](https://galaxy.ansible.com/rmohr/vdsm-prometheus/) to ease the
+installation of `vdsm-prometheus` on every oVirt managed host. Run
 
 ```bash
-cd ansible
-ansible-playbook -s vdsm-prometheus.yml
+ansible-galaxy install rmohr.vdsm-prometheus
 ```
 
-The playbook will install the the latest version of `vdsm-prometheus` from
-[copr](https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/),
-configure systemd, the firewall and finally starts vdsm-prometheus.
-
-It is possible to specify the `vdsm-prometheus` configuration in a playbook.
-For instance to allow browsing the metrics without TLS run a playbook like
-this:
+Now you can use the role in your playbooks. For instance to allow browsing the
+metrics without TLS run a playbook like this:
 
 ```yaml
 ---
@@ -96,6 +87,10 @@ this:
   roles:
     - { role: vdsm-prometheus, opts: "-no-verify -no-prom-auth" }
 ```
+
+The playbook will install the the latest version of `vdsm-prometheus` from
+[copr](https://copr.fedorainfracloud.org/coprs/rfenkhuber/vdsm-prometheus/),
+configure systemd, the firewall and finally starts vdsm-prometheus.
 
 ## Hacking
 The easiest way for development is to disable VDSM TLS authentication on the
