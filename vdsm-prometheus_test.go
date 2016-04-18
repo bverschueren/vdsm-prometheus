@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rmohr/stomp"
 	"io/ioutil"
 	"os"
@@ -24,34 +26,45 @@ func readStats(fileName string) []byte {
 	return bytes
 }
 
-func TestCollectingHostStats(t *testing.T) {
-	channel := make(chan *stomp.Message, 1)
-	channel <- newMessage(readStats(vdsStatsFile))
-	m := &dto.Metric{}
-	gauges := []*OVirtGaugeVec{
-		NewHostGaugeVec("vmCount", "vm_count", "Number of VMs running on the host"),
+func NewTestExporter() *Exporter {
+	return &Exporter{
+		host: localhost,
+		vmDescs: []*Desc{
+			NewVmGaugeDesc("cpuUser", "cpu_user", "Userspace cpu usage"),
+		},
+		hostDescs: []*Desc{
+			NewHostGaugeDesc("vmCount", "vm_count", "Number of VMs running on the host"),
+		},
+		vdsm: new(VDSM),
 	}
-	done := StartProcessingHostStats(MessageFilter(channel), localhost, gauges)
-	close(channel)
-	<-done
-	gauges[0].gaugeVec.WithLabelValues(localhost).Write(m)
-	if expected, got := `label:<name:"host" value:"127.0.0.1" > gauge:<value:3 > `, m.String(); expected != got {
+}
+
+func TestCollectingHostStats(t *testing.T) {
+	metrics := make(chan prometheus.Metric, 20)
+	exporter := NewTestExporter()
+	json, _ := exporter.vdsm.jsonExtractor(newMessage(readStats(vdsStatsFile)))
+	exporter.processHostStats(json, metrics)
+	constMetric := <-metrics
+	metric := dto.Metric{}
+	constMetric.Write(&metric)
+	close(metrics)
+
+	if expected, got := "label: <\n  name: \"host\"\n  value: \"127.0.0.1\"\n>\ngauge: <\n  value: 3\n>\n", proto.MarshalTextString(&metric); expected != got {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
 }
 
 func TestCollectingVmStats(t *testing.T) {
-	channel := make(chan *stomp.Message, 1)
-	channel <- newMessage(readStats(allVmStatsFile))
-	m := &dto.Metric{}
-	gauges := []*OVirtGaugeVec{
-		NewVmGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
-	}
-	done := StartProcessingVmStats(MessageFilter(channel), localhost, gauges)
-	close(channel)
-	<-done
-	gauges[0].gaugeVec.WithLabelValues(localhost, "test1", "7549986b-4f2e-49a7-a692-94017fe0184a").Write(m)
-	if expected, got := `label:<name:"host" value:"127.0.0.1" > label:<name:"vm_id" value:"7549986b-4f2e-49a7-a692-94017fe0184a" > label:<name:"vm_name" value:"test1" > gauge:<value:0.87 > `, m.String(); expected != got {
+	metrics := make(chan prometheus.Metric, 10)
+	exporter := NewTestExporter()
+	json, _ := exporter.vdsm.jsonExtractor(newMessage(readStats(allVmStatsFile)))
+	exporter.processVmStats(json, metrics)
+	constMetric := <-metrics
+	metric := dto.Metric{}
+	constMetric.Write(&metric)
+	close(metrics)
+
+	if expected, got := "label: <\n  name: \"host\"\n  value: \"127.0.0.1\"\n>\nlabel: <\n  name: \"vm_id\"\n  value: \"7549986b-4f2e-49a7-a692-94017fe0184a\"\n>\nlabel: <\n  name: \"vm_name\"\n  value: \"test1\"\n>\ngauge: <\n  value: 0.87\n>\n", proto.MarshalTextString(&metric); expected != got {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
 }

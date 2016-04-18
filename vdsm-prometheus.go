@@ -5,7 +5,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"flag"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rmohr/stomp"
 	"io"
@@ -13,6 +15,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -28,55 +31,66 @@ type Config struct {
 	TLSConfig *tls.Config
 
 	StompHeartBeat time.Duration
-
-	VMScrapeInterval time.Duration
-
-	HostScrapeInterval time.Duration
 }
 
-var (
-	hostGauges = []*OVirtGaugeVec{
-		NewHostGaugeVec("cpuSysVdsmd", "cpu_sys_vdsmd", "System CPU usage of vdsmd"),
-		NewHostGaugeVec("cpuIdle", "cpu_idle", "CPU idle time"),
-		NewHostGaugeVec("memFree", "mem_free", "Free memory"),
-		NewHostGaugeVec("swapFree", "swap_free", "Free swap space"),
-		NewHostGaugeVec("swapTotal", "swap_total", "Total swap space"),
-		NewHostGaugeVec("cpuLoad", "cpu_load", "Current CPU load"),
-		NewHostGaugeVec("ksmPages", "ksm_pages", "KSM pages"),
-		NewHostGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
-		NewHostGaugeVec("txDropped", "tx_dropped", "Dropped TX packages"),
-		NewHostGaugeVec("incomingVmMigrations", "incoming_vm_migrations", "Incoming VM migrations"),
-		NewHostGaugeVec("memShared", "mem_shared", "Shared memory"),
-		NewHostGaugeVec("rxRate", "rx_rate", "RX rate"),
-		NewHostGaugeVec("vmCount", "vm_count", "Number of VMs running on the host"),
-		NewHostGaugeVec("memUsed", "mem_used", "Memory currently in use"),
-		NewHostGaugeVec("cpuSys", "cpu_sys", "System CPU usage"),
-		NewHostGaugeVec("cpuUserVdsmd", "cpu_user_vdsmd", "Userspace CPU usage of vdsmd"),
-		NewHostGaugeVec("memCommitted", "mem_committed", "To VMs committed memory"),
-		NewHostGaugeVec("ksmCpu", "ksm_cpu", "KSM CPU usage"),
-		NewHostGaugeVec("memAvailable", "mem_available", "Available memory"),
-		NewHostGaugeVec("txRate", "tx_rate", "TX rate"),
-		NewHostGaugeVec("rxDropped", "rx_dropped", "Dropped RX packages"),
-		NewHostGaugeVec("outgoingVmMigrations", "outgoing_vm_migrations", "Outgoing VMs"),
-	}
+type Exporter struct {
+	host      string
+	vmDescs   []*Desc
+	hostDescs []*Desc
+	mutex     sync.RWMutex
+	vdsm      *VDSM
+}
 
-	vmGauges = []*OVirtGaugeVec{
-		NewVmGaugeVec("vcpuPeriod", "vcpu_period", "VCPU period"),
-		NewVmGaugeVec("memUsage", "mem_usage", "Memory usage"),
-		NewVmGaugeVec("cpuUsage", "cpu_usage", "CPU usage"),
-		NewVmGaugeVec("cpuUser", "cpu_user", "Userspace cpu usage"),
-		NewVmGaugeVec("monitorResponse", "monitor_response", "Monitor response"),
-		NewVmGaugeVec("cpuSys", "cpy_sys", "System CPU usage"),
-		NewVmGaugeVec("vcpuCount", "vcpu_count", "VCPU count"),
-	}
-)
+type VDSM struct {
+	vmStatsSub   *stomp.Subscription
+	hostStatsSub *stomp.Subscription
+	conn         *stomp.Conn
+	config       *Config
+}
 
-func init() {
-	for _, vmGauge := range vmGauges {
-		prometheus.MustRegister(vmGauge.gaugeVec.(*prometheus.GaugeVec))
+func (t *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	for _, desc := range t.vmDescs {
+		ch <- desc.desc
 	}
-	for _, hostGauge := range hostGauges {
-		prometheus.MustRegister(hostGauge.gaugeVec.(*prometheus.GaugeVec))
+	for _, desc := range t.hostDescs {
+		ch <- desc.desc
+	}
+}
+
+func (t *Exporter) Collect(ch chan<- prometheus.Metric) {
+	var err error
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.vdsm.ConnectIfNecessary()
+	stats, err := t.vdsm.GetHostStats()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	err = t.processHostStats(stats, ch)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	stats, err = t.vdsm.GetVmStats()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	err = t.processVmStats(stats, ch)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+}
+
+func NewExporter(config *Config) *Exporter {
+	return &Exporter{
+		host:      config.Host,
+		vmDescs:   NewVmGaugeDescs(),
+		hostDescs: NewHostGaugeDescs(),
+		vdsm:      &VDSM{config: config},
 	}
 }
 
@@ -93,8 +107,10 @@ func main() {
 	promCert := flag.String("prom-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the Prometheus client server certificate")
 	promKey := flag.String("prom-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the Prometheus client server certificate key")
 	stompHeartBeat := flag.Int("stomp-heartbeat", 5, "Stomp heartbeat in seconds")
-	vmScrapeInterval := flag.Int("vm-scrape-interval", 10, "VM metrics scrape interval in seconds")
-	hostScrapeInterval := flag.Int("host-scrape-interval", 10, "Host metrics statistics scrape interval in seconds")
+
+	//Deprecated, will be removed on the first major release
+	flag.Int("vm-scrape-interval", -1, "DEPRECATED, has no effect")
+	flag.Int("host-scrape-interval", -1, "DEPRECATED, has no effect")
 
 	flag.Parse()
 
@@ -104,8 +120,6 @@ func main() {
 	config.Port = *port
 	config.NoVerify = *noVerify
 	config.StompHeartBeat = time.Duration(*stompHeartBeat) * time.Second
-	config.VMScrapeInterval = time.Duration(*vmScrapeInterval) * time.Second
-	config.HostScrapeInterval = time.Duration(*hostScrapeInterval) * time.Second
 
 	if config.Secured {
 		roots := x509.NewCertPool()
@@ -137,16 +151,8 @@ func main() {
 		config.Host = "127.0.0.1"
 	}
 
-	go func() {
-		for {
-			StartMonitoringVdsm(config)
-			log.Printf("No connection to VDSM at %s:%s. Will retry in 5 seconds.", config.Host, config.Port)
-			ResetGauges(hostGauges)
-			ResetGauges(vmGauges)
-			time.Sleep(5 * time.Second)
-		}
-	}()
-
+	exporter := NewExporter(config)
+	prometheus.MustRegister(exporter)
 	http.Handle("/metrics", prometheus.Handler())
 
 	if !*noPromAuth {
@@ -170,175 +176,134 @@ func main() {
 	}
 }
 
-func StartMonitoringVdsm(config *Config) {
+func (t *VDSM) ConnectIfNecessary() error {
 	var err error
 	var tcpCon io.ReadWriteCloser
-	if config.Secured {
-		tcpCon, err = tls.Dial("tcp", config.Host+":"+config.Port, config.TLSConfig)
+	if t.conn != nil {
+		return nil
+	}
+	if t.config.Secured {
+		tcpCon, err = tls.Dial("tcp", t.config.Host+":"+t.config.Port, t.config.TLSConfig)
 	} else {
-		tcpCon, err = net.Dial("tcp", config.Host+":"+config.Port)
+		tcpCon, err = net.Dial("tcp", t.config.Host+":"+t.config.Port)
 	}
 	if err != nil {
-		log.Print(err)
-		return
+		return err
 	}
-	conn, err := stomp.Connect(tcpCon,
+	t.conn, err = stomp.Connect(tcpCon,
 		stomp.ConnOpt.AcceptVersion(stomp.V12),
-		stomp.ConnOpt.HeartBeat(config.StompHeartBeat, config.StompHeartBeat),
+		stomp.ConnOpt.HeartBeat(t.config.StompHeartBeat, t.config.StompHeartBeat),
 	)
 	if err != nil {
-		log.Print(err)
-		return
+		return err
 	}
-	log.Printf("Connected to VDSM at %s:%s.", config.Host, config.Port)
+	log.Printf("Connected to VDSM at %s:%s.", t.config.Host, t.config.Port)
 
-	vdsStatsSub, err := conn.Subscribe("jms.queue.vdsStats", stomp.AckAuto,
+	t.hostStatsSub, err = t.conn.Subscribe("jms.queue.vdsStats", stomp.AckAuto,
 		stomp.SubscribeOpt.Header("id", "1234"))
 	if err != nil {
-		log.Print(err)
-		return
+		return err
 	}
 	log.Print("Subscribed to 'jms.queue.vdsStats'.")
 
-	vmStatsSub, err := conn.Subscribe("jms.queue.vmStats", stomp.AckAuto,
+	t.vmStatsSub, err = t.conn.Subscribe("jms.queue.vmStats", stomp.AckAuto,
 		stomp.SubscribeOpt.Header("id", "12345"))
 	if err != nil {
-		log.Print(err)
-		return
+		return err
 	}
 	log.Print("Subscribed to 'jms.queue.vmStats'.")
+	return nil
+}
 
-	hostProcChan := StartProcessingHostStats(MessageFilter(vdsStatsSub.C), config.Host, hostGauges)
-	vmProcChan := StartProcessingVmStats(MessageFilter(vmStatsSub.C), config.Host, vmGauges)
-
-	hostReqChan := StartRequestingHostStats(conn, "jms.queue.vdsStats", "Host.getStats", "1234", config.HostScrapeInterval)
-	vmReqChan := StartRequestingHostStats(conn, "jms.queue.vmStats", "Host.getAllVmStats", "12345", config.VMScrapeInterval)
-
-	select {
-	case <-hostProcChan:
-	case <-vmProcChan:
-	case <-hostReqChan:
-	case <-vmReqChan:
+func (t *VDSM) disconnect() {
+	if t.conn != nil {
+		// The stomp implementation is not trustworthy. A regular disconnect
+		// can block in case of network errors
+		t.conn.MustDisconnect()
+		t.conn = nil
 	}
-	conn.MustDisconnect()
-
-	<-hostProcChan
-	log.Print("Host processing finished.")
-	<-vmProcChan
-	log.Print("VM processing finished.")
-	<-hostReqChan
-	log.Print("Requesting host stats finished.")
-	<-vmReqChan
-	log.Print("Requesting vm stats finished.")
 }
 
-func StartRequestingHostStats(conn *stomp.Conn, destination string, method string, id string, scrape_interval time.Duration) chan error {
-	done := make(chan error)
-	go func() {
-		defer close(done)
-		for {
-			err := conn.Send("jms.topic.vdsm_requests", "application/json",
-				[]byte(`{"jsonrpc": "2.0","method": "`+method+`","id": `+id+`, "params": []}`),
-				stomp.SendOpt.Header("reply-to", destination),
-				stomp.SendOpt.Header("id", id))
-			if err != nil {
-				log.Print(err)
-				return
-			}
-			time.Sleep(scrape_interval)
-		}
-	}()
-	return done
-}
-
-func MessageFilter(messages chan *stomp.Message) chan interface{} {
-	out := make(chan interface{})
-	go func() {
-		defer close(out)
-		for msg := range messages {
-			if msg.Err != nil {
-				log.Print(msg.Err)
-				return
-			}
-			var dat map[string]interface{}
-			if err := json.Unmarshal(msg.Body[:], &dat); err != nil {
-				log.Print(err)
-			} else if dat["error"] != nil {
-				err := dat["error"].(map[string]interface{})
-				log.Printf("JSON-RPC failed with error code %.0f: %s ", toFloat64(err["code"]), err["message"].(string))
-			} else if dat["result"] == nil {
-				log.Print("JSON-RPC response contains no 'error' and no 'result' field")
-			} else {
-				out <- dat["result"].(interface{})
-			}
-		}
-	}()
-	return out
-}
-
-func StartProcessingHostStats(stats chan interface{}, host string, gauges []*OVirtGaugeVec) chan error {
-	done := make(chan error)
-	go func() {
-		defer close(done)
-		collector := NewHostStatsCollector(gauges, host)
-		for stat := range stats {
-			hostData, found := stat.(map[string]interface{})
-			if found == true {
-				collector.Process(hostData)
-			} else {
-				collector.Reset()
-				log.Print("Expected map but got something else.")
-				break
-			}
-		}
-	}()
-	return done
-}
-
-func StartProcessingVmStats(stats chan interface{}, host string, gauges []*OVirtGaugeVec) chan error {
-	done := make(chan error)
-	go func() {
-		defer close(done)
-		lastVMs := make(map[string]bool)
-		lastVmsCollectors := make(map[string]*StatsCollector)
-		for stat := range stats {
-			dat, found := stat.([]interface{})
-			if found == false {
-				log.Print("Expected array but got something else.")
-				return
-			}
-			for k, _ := range lastVMs {
-				lastVMs[k] = false
-			}
-			for _, vm_data := range dat {
-				vm, found := vm_data.(map[string]interface{})
-				if found == false {
-					log.Print("Expected map but got something else.")
-					return
-				}
-				vmId := vm["vmId"].(string)
-				lastVMs[vmId] = true
-				if _, exists := lastVmsCollectors[vmId]; !exists {
-					lastVmsCollectors[vmId] = NewVmStatsCollector(gauges, host, vm)
-				}
-				lastVmsCollectors[vmId].Process(vm)
-			}
-			for k, v := range lastVMs {
-				if v == false {
-					lastVmsCollectors[k].Delete()
-					delete(lastVMs, k)
-					delete(lastVmsCollectors, k)
-				}
-			}
-		}
-	}()
-	return done
-}
-
-func ResetGauges(gauges []*OVirtGaugeVec) {
-	for _, gauge := range gauges {
-		gauge.gaugeVec.Reset()
+func (t *VDSM) requestStats(destination string, method string, id string) error {
+	err := t.conn.Send("jms.topic.vdsm_requests", "application/json",
+		[]byte(`{"jsonrpc": "2.0","method": "`+method+`","id": `+id+`, "params": []}`),
+		stomp.SendOpt.Header("reply-to", destination),
+		stomp.SendOpt.Header("id", id))
+	if err != nil {
+		return err
 	}
+	return nil
+}
+
+func (t *VDSM) GetVmStats() (interface{}, error) {
+	err := t.requestStats("jms.queue.vmStats", "Host.getAllVmStats", "12345")
+	if err != nil {
+		t.disconnect()
+		return nil, err
+	}
+	stats, err := t.jsonExtractor(<-t.vmStatsSub.C)
+	if err != nil {
+		t.disconnect()
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (t *VDSM) GetHostStats() (interface{}, error) {
+	err := t.requestStats("jms.queue.vdsStats", "Host.getStats", "1234")
+	if err != nil {
+		t.disconnect()
+		return nil, err
+	}
+	stats, err := t.jsonExtractor(<-t.hostStatsSub.C)
+	if err != nil {
+		t.disconnect()
+		return nil, err
+	}
+	return stats, nil
+}
+
+func (t *VDSM) jsonExtractor(msg *stomp.Message) (interface{}, error) {
+	if msg.Err != nil {
+		return nil, msg.Err
+	}
+	var dat map[string]interface{}
+	if err := json.Unmarshal(msg.Body[:], &dat); err != nil {
+		return nil, err
+	} else if dat["error"] != nil {
+		err := dat["error"].(map[string]interface{})
+		return nil, errors.New(fmt.Sprintf("JSON-RPC failed with error code %.0f: %s ", toFloat64(err["code"]), err["message"].(string)))
+	} else if dat["result"] == nil {
+		return nil, errors.New("JSON-RPC response contains no 'error' and no 'result' field")
+	} else {
+		return dat["result"].(interface{}), nil
+	}
+}
+
+func (t *Exporter) processHostStats(stats interface{}, ch chan<- prometheus.Metric) error {
+	collector := NewHostStatsCollector(t.hostDescs, t.host)
+	hostData, found := stats.(map[string]interface{})
+	if found == true {
+		collector.Process(hostData, ch)
+	} else {
+		errors.New("Expected map but got something else.")
+	}
+	return nil
+}
+
+func (t *Exporter) processVmStats(stats interface{}, ch chan<- prometheus.Metric) error {
+	dat, found := stats.([]interface{})
+	if found == false {
+		return errors.New("Expected array but got something else.")
+	}
+	for _, vm_data := range dat {
+		vm, found := vm_data.(map[string]interface{})
+		if found == false {
+			return errors.New("Expected map but got something else.")
+		}
+		NewVmStatsCollector(t.vmDescs, t.host, vm).Process(vm, ch)
+	}
+	return nil
 }
 
 func readFile(fileName string) []byte {

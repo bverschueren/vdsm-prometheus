@@ -5,40 +5,60 @@ import (
 	"strconv"
 )
 
-type GaugeVec interface {
-	WithLabelValues(lvs ...string) prometheus.Gauge
-	With(labels prometheus.Labels) prometheus.Gauge
-	Delete(labels prometheus.Labels) bool
-	Reset()
+type Desc struct {
+	desc      *prometheus.Desc
+	json_path string
 }
 
-type OVirtGaugeVec struct {
-	gaugeVec GaugeVec
-	field    string
+func NewVmGaugeDescs() []*Desc {
+	return []*Desc{
+		NewVmGaugeDesc("vcpuPeriod", "vcpu_period", "VCPU period"),
+		NewVmGaugeDesc("memUsage", "mem_usage", "Memory usage"),
+		NewVmGaugeDesc("cpuUsage", "cpu_usage", "CPU usage"),
+		NewVmGaugeDesc("cpuUser", "cpu_user", "Userspace cpu usage"),
+		NewVmGaugeDesc("monitorResponse", "monitor_response", "Monitor response"),
+		NewVmGaugeDesc("cpuSys", "cpy_sys", "System CPU usage"),
+		NewVmGaugeDesc("vcpuCount", "vcpu_count", "VCPU count"),
+	}
 }
 
-func NewVmGaugeVec(field string, name string, help string) *OVirtGaugeVec {
-	vec := new(OVirtGaugeVec)
-	vec.field = field
-	vec.gaugeVec = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "vm_" + name,
-			Help: help,
-		},
-		[]string{"host", "vm_name", "vm_id"})
-	return vec
+func NewHostGaugeDescs() []*Desc {
+	return []*Desc{
+		NewHostGaugeDesc("cpuSysVdsmd", "cpu_sys_vdsmd", "System CPU usage of vdsmd"),
+		NewHostGaugeDesc("cpuIdle", "cpu_idle", "CPU idle time"),
+		NewHostGaugeDesc("memFree", "mem_free", "Free memory"),
+		NewHostGaugeDesc("swapFree", "swap_free", "Free swap space"),
+		NewHostGaugeDesc("swapTotal", "swap_total", "Total swap space"),
+		NewHostGaugeDesc("cpuLoad", "cpu_load", "Current CPU load"),
+		NewHostGaugeDesc("ksmPages", "ksm_pages", "KSM pages"),
+		NewHostGaugeDesc("cpuUser", "cpu_user", "Userspace cpu usage"),
+		NewHostGaugeDesc("txDropped", "tx_dropped", "Dropped TX packages"),
+		NewHostGaugeDesc("incomingVmMigrations", "incoming_vm_migrations", "Incoming VM migrations"),
+		NewHostGaugeDesc("memShared", "mem_shared", "Shared memory"),
+		NewHostGaugeDesc("rxRate", "rx_rate", "RX rate"),
+		NewHostGaugeDesc("vmCount", "vm_count", "Number of VMs running on the host"),
+		NewHostGaugeDesc("memUsed", "mem_used", "Memory currently in use"),
+		NewHostGaugeDesc("cpuSys", "cpu_sys", "System CPU usage"),
+		NewHostGaugeDesc("cpuUserVdsmd", "cpu_user_vdsmd", "Userspace CPU usage of vdsmd"),
+		NewHostGaugeDesc("memCommitted", "mem_committed", "To VMs committed memory"),
+		NewHostGaugeDesc("ksmCpu", "ksm_cpu", "KSM CPU usage"),
+		NewHostGaugeDesc("memAvailable", "mem_available", "Available memory"),
+		NewHostGaugeDesc("txRate", "tx_rate", "TX rate"),
+		NewHostGaugeDesc("rxDropped", "rx_dropped", "Dropped RX packages"),
+		NewHostGaugeDesc("outgoingVmMigrations", "outgoing_vm_migrations", "Outgoing VMs"),
+	}
 }
 
-func NewHostGaugeVec(field string, name string, help string) *OVirtGaugeVec {
-	vec := new(OVirtGaugeVec)
-	vec.field = field
-	vec.gaugeVec = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "host_" + name,
-			Help: help,
-		},
-		[]string{"host"})
-	return vec
+func NewVmGaugeDesc(json_path string, name string, help string) *Desc {
+	return &Desc{
+		prometheus.NewDesc("vm_"+name, help, []string{"host", "vm_name", "vm_id"}, nil),
+		json_path}
+}
+
+func NewHostGaugeDesc(json_path string, name string, help string) *Desc {
+	return &Desc{
+		prometheus.NewDesc("host_"+name, help, []string{"host"}, nil),
+		json_path}
 }
 
 func toFloat64(o interface{}) float64 {
@@ -52,43 +72,28 @@ func toFloat64(o interface{}) float64 {
 }
 
 type StatsCollector struct {
-	gauges []*OVirtGaugeVec
-	labels prometheus.Labels
+	descs  []*Desc
+	labels []string
 }
 
-func NewVmStatsCollector(gauges []*OVirtGaugeVec, host string, vm_data map[string]interface{}) *StatsCollector {
-	vmStats := NewHostStatsCollector(gauges, host)
-	vmStats.labels["vm_name"] = vm_data["vmName"].(string)
-	vmStats.labels["vm_id"] = vm_data["vmId"].(string)
-	return vmStats
+func NewVmStatsCollector(descs []*Desc, host string, vm_data map[string]interface{}) *StatsCollector {
+	return &StatsCollector{
+		descs:  descs,
+		labels: []string{host, vm_data["vmName"].(string), vm_data["vmId"].(string)},
+	}
 }
 
-func NewHostStatsCollector(gauges []*OVirtGaugeVec, host string) *StatsCollector {
-	hostStats := new(StatsCollector)
-	hostStats.labels = make(prometheus.Labels)
-	hostStats.gauges = gauges
-	hostStats.labels["host"] = host
-	return hostStats
+func NewHostStatsCollector(descs []*Desc, host string) *StatsCollector {
+	return &StatsCollector{
+		descs:  descs,
+		labels: []string{host},
+	}
 }
 
-func (t *StatsCollector) Process(data map[string]interface{}) {
-	for _, gauge := range t.gauges {
-		if data[gauge.field] != nil {
-			gauge.gaugeVec.With(t.labels).Set(toFloat64(data[gauge.field]))
-		} else {
-			gauge.gaugeVec.Delete(t.labels)
+func (t *StatsCollector) Process(data map[string]interface{}, ch chan<- prometheus.Metric) {
+	for _, desc := range t.descs {
+		if data[desc.json_path] != nil {
+			ch <- prometheus.MustNewConstMetric(desc.desc, prometheus.GaugeValue, toFloat64(data[desc.json_path]), t.labels...)
 		}
-	}
-}
-
-func (t *StatsCollector) Delete() {
-	for _, gauge := range t.gauges {
-		gauge.gaugeVec.Delete(t.labels)
-	}
-}
-
-func (t *StatsCollector) Reset() {
-	for _, gauge := range t.gauges {
-		gauge.gaugeVec.Reset()
 	}
 }
