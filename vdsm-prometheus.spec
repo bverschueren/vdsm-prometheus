@@ -7,7 +7,7 @@
 %global import_path     %{provider_prefix}
 
 Name:           %{repo}
-Version:        0.0.3
+Version:        0.0.4
 Release:        1%{?dist}
 Summary:        Go client for VDSM which exposes host and VM stats as prometheus metrics
 License:        GPLv3+
@@ -68,6 +68,9 @@ install -D -p 10-%{name}.conf %{buildroot}%{_unitdir}/%{name}.service.d/10-%{nam
 %config %{_unitdir}/%{name}.service.d
 
 %changelog
+* Thu Apr 28 2016 Roman Mohr <rmohr@redhat.com> 0.0.4-1
+- Set default metric update interval to ten seconds
+
 * Thu Mar 24 2016 Roman Mohr <rmohr@redhat.com> 0.0.3-1
 - new package built with tito
 
