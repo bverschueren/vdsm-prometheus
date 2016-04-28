@@ -93,8 +93,8 @@ func main() {
 	promCert := flag.String("prom-cert", "/etc/pki/vdsm/certs/vdsmcert.pem", "Path to the Prometheus client server certificate")
 	promKey := flag.String("prom-key", "/etc/pki/vdsm/keys/vdsmkey.pem", "Path to the Prometheus client server certificate key")
 	stompHeartBeat := flag.Int("stomp-heartbeat", 5, "Stomp heartbeat in seconds")
-	vmScrapeInterval := flag.Int("vm-scrape-interval", 3, "VM metrics scrape interval in seconds")
-	hostScrapeInterval := flag.Int("host-scrape-interval", 3, "Host metrics statistics scrape interval in seconds")
+	vmScrapeInterval := flag.Int("vm-scrape-interval", 10, "VM metrics scrape interval in seconds")
+	hostScrapeInterval := flag.Int("host-scrape-interval", 10, "Host metrics statistics scrape interval in seconds")
 
 	flag.Parse()
 
