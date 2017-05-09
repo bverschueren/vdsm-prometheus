@@ -46,8 +46,8 @@ cp %{_builddir}/go/%{import_path}/%{name} .
 
 %install
 install -D -p -m 755 %{name} %{buildroot}%{_bindir}/%{name}
-install -D -p %{name}.service %{buildroot}%{_unitdir}/%{name}.service
-install -D -p 10-%{name}.conf %{buildroot}%{_unitdir}/%{name}.service.d/10-%{name}.conf
+install -D -p -m 644 %{name}.service %{buildroot}%{_unitdir}/%{name}.service
+install -D -p -m 644 10-%{name}.conf %{buildroot}%{_unitdir}/%{name}.service.d/10-%{name}.conf
 
 %check
 
