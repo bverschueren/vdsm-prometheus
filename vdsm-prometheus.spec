@@ -8,7 +8,7 @@
 
 Name:           %{repo}
 Version:        0.0.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Go client for VDSM which exposes host and VM stats as prometheus metrics
 License:        GPLv3+
 URL:            https://%{provider_prefix}
@@ -68,6 +68,9 @@ install -D -p -m 644 10-%{name}.conf %{buildroot}%{_unitdir}/%{name}.service.d/1
 %config %{_unitdir}/%{name}.service.d
 
 %changelog
+* Wed May 10 2017 Roman Mohr <rmohr@redhat.com> 0.0.4-2
+- Fix systemd permission issue
+
 * Thu Apr 28 2016 Roman Mohr <rmohr@redhat.com> 0.0.4-1
 - Set default metric update interval to ten seconds
 
