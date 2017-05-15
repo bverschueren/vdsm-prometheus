@@ -35,8 +35,8 @@ type Config struct {
 
 type Exporter struct {
 	host      string
-	vmDescs   []*Desc
-	hostDescs []*Desc
+	vmDescs   []VDSMMetric
+	hostDescs []VDSMMetric
 	mutex     sync.RWMutex
 	vdsm      *VDSM
 }
@@ -50,10 +50,10 @@ type VDSM struct {
 
 func (t *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, desc := range t.vmDescs {
-		ch <- desc.desc
+		desc.Describe(ch)
 	}
 	for _, desc := range t.hostDescs {
-		ch <- desc.desc
+		desc.Describe(ch)
 	}
 }
 

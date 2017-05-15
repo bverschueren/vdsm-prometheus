@@ -29,10 +29,10 @@ func readStats(fileName string) []byte {
 func NewTestExporter() *Exporter {
 	return &Exporter{
 		host: localhost,
-		vmDescs: []*Desc{
+		vmDescs: []VDSMMetric{
 			NewVmGaugeDesc("cpuUser", "cpu_user", "Userspace cpu usage"),
 		},
-		hostDescs: []*Desc{
+		hostDescs: []VDSMMetric{
 			NewHostGaugeDesc("vmCount", "vm_count", "Number of VMs running on the host"),
 		},
 		vdsm: new(VDSM),

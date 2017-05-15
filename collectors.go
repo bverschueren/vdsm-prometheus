@@ -5,13 +5,31 @@ import (
 	"strconv"
 )
 
+type VDSMMetric interface {
+	Collect(data map[string]interface{}, labels []string, ch chan<- prometheus.Metric)
+	Describe(ch chan<- *prometheus.Desc)
+	Matches(data map[string]interface{}) bool
+}
+
 type Desc struct {
 	desc      *prometheus.Desc
 	json_path string
 }
 
-func NewVmGaugeDescs() []*Desc {
-	return []*Desc{
+func (d *Desc) Collect(data map[string]interface{}, labels []string, ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(d.desc, prometheus.GaugeValue, toFloat64(data[d.json_path]), labels...)
+}
+
+func (d *Desc) Describe(ch chan<- *prometheus.Desc) {
+	ch <- d.desc
+}
+
+func (d *Desc) Matches(data map[string]interface{}) bool {
+	return data[d.json_path] != nil
+}
+
+func NewVmGaugeDescs() []VDSMMetric {
+	return []VDSMMetric{
 		NewVmGaugeDesc("vcpuPeriod", "vcpu_period", "VCPU period"),
 		NewVmGaugeDesc("memUsage", "mem_usage", "Memory usage"),
 		NewVmGaugeDesc("cpuUsage", "cpu_usage", "CPU usage"),
@@ -22,8 +40,8 @@ func NewVmGaugeDescs() []*Desc {
 	}
 }
 
-func NewHostGaugeDescs() []*Desc {
-	return []*Desc{
+func NewHostGaugeDescs() []VDSMMetric {
+	return []VDSMMetric{
 		NewHostGaugeDesc("cpuSysVdsmd", "cpu_sys_vdsmd", "System CPU usage of vdsmd"),
 		NewHostGaugeDesc("cpuIdle", "cpu_idle", "CPU idle time"),
 		NewHostGaugeDesc("memFree", "mem_free", "Free memory"),
@@ -72,18 +90,18 @@ func toFloat64(o interface{}) float64 {
 }
 
 type StatsCollector struct {
-	descs  []*Desc
+	descs  []VDSMMetric
 	labels []string
 }
 
-func NewVmStatsCollector(descs []*Desc, host string, vm_data map[string]interface{}) *StatsCollector {
+func NewVmStatsCollector(descs []VDSMMetric, host string, vm_data map[string]interface{}) *StatsCollector {
 	return &StatsCollector{
 		descs:  descs,
 		labels: []string{host, vm_data["vmName"].(string), vm_data["vmId"].(string)},
 	}
 }
 
-func NewHostStatsCollector(descs []*Desc, host string) *StatsCollector {
+func NewHostStatsCollector(descs []VDSMMetric, host string) *StatsCollector {
 	return &StatsCollector{
 		descs:  descs,
 		labels: []string{host},
@@ -92,8 +110,8 @@ func NewHostStatsCollector(descs []*Desc, host string) *StatsCollector {
 
 func (t *StatsCollector) Process(data map[string]interface{}, ch chan<- prometheus.Metric) {
 	for _, desc := range t.descs {
-		if data[desc.json_path] != nil {
-			ch <- prometheus.MustNewConstMetric(desc.desc, prometheus.GaugeValue, toFloat64(data[desc.json_path]), t.labels...)
+		if desc.Matches(data) {
+			desc.Collect(data, t.labels, ch)
 		}
 	}
 }
